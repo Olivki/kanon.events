@@ -1,6 +1,6 @@
 ## kanon.events
 
-Event handling with annotations, and in C# style for Kotlin.
+Event handling with annotations for Kotlin.
 
 ## Installation
 
@@ -39,16 +39,15 @@ Maven
     <version>${LATEST_VERSION}</version>
     <type>pom</type>
 </dependency>
-
 ```
 
 ## Credits
 
-[Event4J](https://github.com/Techcable/Event4J) by [Techcable](https://github.com/Techcable) served as a big inspiration and point of reference for this project.
+[Event4J](https://github.com/Techcable/Event4J) by [Techcable](https://github.com/Techcable).
+This project is derivate of Techtables old Event4J project, and could probably be seen as a "spiritual port".
+The Event4J project is licensed under the MIT license, which means any entries that are derivate will be marked with the appropriate license in the source code. This project is, however, still published under the Apache 2.0 license.
 
 ## License
-
-Unless stated otherwise, all the code in this project is under the Apache 2.0 License;
 
 ````
 Copyright 2019 Oliver Berg
@@ -65,5 +64,3 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ````
-
-Deviations from the Apache 2.0 License are documented as such, and generally, these deviations will be under the MIT license.

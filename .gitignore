@@ -100,3 +100,5 @@ gradle-app.setting
 # gradle/wrapper/gradle-wrapper.properties
 
 !/appender.jar
+/src/test/kotlin/Test.kt
+/src/test/kotlin/EventTests.kt
