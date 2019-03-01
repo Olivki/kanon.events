@@ -14,7 +14,7 @@ Gradle
   }
   
   dependencies {
-      implementation "moe.kanon.events:moe.kanon:${LATEST_VERSION}"
+      implementation "moe.kanon.events:kanon.events:${LATEST_VERSION}"
   }
   ```
 
@@ -26,7 +26,7 @@ Gradle
   }
   
   dependencies {
-      implementation(group = "moe.kanon.events", name = "moe.kanon", version = "${LATEST_VERSION}")
+      implementation(group = "moe.kanon.events", name = "kanon.events", version = "${LATEST_VERSION}")
   }
   ```
 
@@ -35,7 +35,7 @@ Maven
 ```xml
 <dependency>
     <groupId>moe.kanon.events</groupId>
-    <artifactId>moe.kanon</artifactId>
+    <artifactId>kanon.events</artifactId>
     <version>${LATEST_VERSION}</version>
     <type>pom</type>
 </dependency>

@@ -29,17 +29,20 @@
  */
 
 @file:JvmName("Events")
+@file:Suppress("NOTHING_TO_INLINE")
 
 // TODO Rename?
 
 package moe.kanon.events
 
+import mu.KotlinLogging
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KAnnotatedElement
 import kotlin.reflect.KClass
+import kotlin.reflect.full.allSuperclasses
+import kotlin.reflect.full.declaredMemberFunctions
 import kotlin.reflect.full.findAnnotation
-import kotlin.reflect.full.memberFunctions
 
 /**
  * Represents a basic implementation of an event.
@@ -124,7 +127,7 @@ enum class EventPriority {
     NORMAL,
     HIGH,
     HIGHEST,
-    MONITOR
+    OBSERVER
 }
 
 /**
@@ -138,17 +141,27 @@ enum class EventPriority {
  * @constructor The constructor for the event-bus.
  * @see EventBus.default
  * @see EventBus.create
- * @see eventBus
+ * @see eventBusOf
  */
 class EventBus<E : Any, L : Any> private constructor(
-    val eventClass: KClass<E>,
-    val listenerClass: KClass<L>
-) {
+    val eventClass: KClass<out E>,
+    val listenerClass: KClass<out L>
+) : Iterable<ListenerHandler<E, L>> {
     
     /**
      * Holds the instances of the listener handlers.
      */
-    val handlers: MutableMap<KClass<*>, ListenerHandler<E, L>> = ConcurrentHashMap()
+    private val handlers: MutableMap<KClass<out E>, ListenerHandler<E, L>> = ConcurrentHashMap()
+    
+    /**
+     * Returns how many listeners are registered.
+     */
+    val size: Int @JvmName("size") get() = handlers.size
+    
+    /**
+     * The logger used by the event-bus.
+     */
+    private val logger = KotlinLogging.logger {}
     
     /**
      * Fires the given [event] to the appropriate [listener-handler][ListenerHandler], which then spreads it to all
@@ -159,13 +172,19 @@ class EventBus<E : Any, L : Any> private constructor(
      * This function is weakly consistent, and may not see `listeners` that are added while it is firing.
      *
      * @param [event] The `event` to fire.
+     *
+     * @return the event that was just fired.
      */
-    fun fire(event: E) {
+    fun fire(event: E): E {
         // If the given listener is somehow not an instance of the set eventClass, then just fail loudly.
         require(eventClass.isInstance(event)) { "${event::class} is not a valid event, it needs to be an instance of $eventClass." }
         
+        logger.debug { "Firing event <$event>." }
+        
         handlers[event::class]?.notify(event) // If it returns null it just means that there's no registered listener
         // that's waiting for that specific event, so we just don't do anything.
+        
+        return event
     }
     
     /**
@@ -179,13 +198,19 @@ class EventBus<E : Any, L : Any> private constructor(
         // If the given listener is somehow not an instance of the set listenerClass, then just fail loudly.
         require(listenerClass.isInstance(listener)) { "Invalid listener type: ${listener::class}, needs to be instance of $listenerClass." }
         
+        val listenerFuncs = listener::class.declaredMemberFunctions.filter { it.hasAnnotation<Subscribe>() }
+        
+        if (listenerFuncs.isEmpty()) logger.debug { "<${listener::class}> has no listener functions." }
+        
         // because the .forEach {...} closure is slower than a normal loop.
-        for (func in listener::class.memberFunctions.filter { it.hasAnnotation<Subscribe>() }) {
-            val registeredListener = RegisteredListener(this, listener, func, func.findAnnotation()!!) // We know that
+        for (func in listenerFuncs) {
+            val registeredListener =
+                RegisteredListener(this, listener, func, func.findAnnotation()!!) // We know that
             // the @Subscribe annotation is there because we filtered for it explicitly.
             val handler = handlers.computeIfAbsent(registeredListener.eventClass) { ListenerHandler() }
             
             handler.register(registeredListener)
+            logger.info { "Registered <$listener> as an event-listener." }
         }
     }
     
@@ -205,10 +230,14 @@ class EventBus<E : Any, L : Any> private constructor(
     @Throws(IllegalArgumentException::class)
     fun <SE : SynchronizedEvent> registerSynchronized(listener: L) {
         // If the given listener is somehow not an instance of the set listenerClass, then just fail loudly.
-        require(!listenerClass.isInstance(listener)) { "Invalid listener type: ${listener::class}" }
+        require(listenerClass.isInstance(listener)) { "Invalid listener type <${listener::class}>, expected: $listenerClass" }
+    
+        val listenerFuncs = listener::class.declaredMemberFunctions.filter { it.hasAnnotation<Subscribe>() }
+    
+        if (listenerFuncs.isEmpty()) logger.debug { "<${listener::class}> has no listener functions." }
         
         // because the .forEach {...} closure is slower than a normal loop.
-        for (func in listener::class.memberFunctions.filter { it.hasAnnotation<Subscribe>() }) {
+        for (func in listenerFuncs) {
             val registeredListener = RegisteredListener(this, listener, func, func.findAnnotation()!!) // We know that
             // the @Subscribe annotation is there because we filtered for it explicitly.
             val handler = handlers.computeIfAbsent(registeredListener.eventClass) {
@@ -216,6 +245,7 @@ class EventBus<E : Any, L : Any> private constructor(
             }
             
             handler.register(registeredListener)
+            logger.info { "Registered <$listener> as a synchronized event-listener." }
         }
     }
     
@@ -226,7 +256,7 @@ class EventBus<E : Any, L : Any> private constructor(
      * @param [listener] The object to convert into a [registered-listener][RegisteredListener].
      */
     @JvmSynthetic
-    operator fun plusAssign(listener: L) = register(listener)
+    inline operator fun plusAssign(listener: L) = register(listener)
     
     /**
      * Attempts to unregister the given [listener] from the handlers.
@@ -237,9 +267,9 @@ class EventBus<E : Any, L : Any> private constructor(
      */
     @Throws(IllegalArgumentException::class)
     fun unregister(listener: L) {
-        require(!listenerClass.isInstance(listener)) { "Invalid listener type: ${listener::class}" }
-    
-        for (func in listener::class.memberFunctions.filter { it.hasAnnotation<Subscribe>() }) {
+        require(listenerClass.isInstance(listener)) { "Invalid listener type <${listener::class.allSuperclasses}>, expected: <$listenerClass>." }
+        
+        for (func in listener::class.declaredMemberFunctions.filter { it.hasAnnotation<Subscribe>() }) {
             val registeredListener = RegisteredListener(this, listener, func, func.findAnnotation()!!) // We know that
             // the @Subscribe annotation is there because we filtered for it explicitly.
             
@@ -247,6 +277,7 @@ class EventBus<E : Any, L : Any> private constructor(
             
             // We know that it won't be null, because we already checked that the map contained the key.
             handlers[registeredListener.eventClass]!! -= registeredListener
+            logger.info { "Unregistered <$listener> as an event-listener." }
         }
     }
     
@@ -258,7 +289,42 @@ class EventBus<E : Any, L : Any> private constructor(
      * @param [listener] The listener to unregister.
      */
     @JvmSynthetic
-    operator fun minusAssign(listener: L) = unregister(listener)
+    inline operator fun minusAssign(listener: L) = unregister(listener)
+    
+    /**
+     * Returns the [ListenerHandler] registered under the specified [clz], or throws a [NoSuchElementException] if none is
+     * found.
+     */
+    operator fun get(clz: KClass<out E>): ListenerHandler<E, L> = getOrNull(clz)
+        ?: throw NoSuchElementException("There's no listener-handler registered under the class <${clz.qualifiedName}>.")
+    
+    /**
+     * Returns the [ListenerHandler] registered under the specified [clz], or `null` if none is found.
+     */
+    fun getOrNull(clz: KClass<out E>): ListenerHandler<E, L>? = handlers[clz]
+    
+    /**
+     * Returns whether or not there's a [ListenerHandler] registered under the specified [clz].
+     *
+     * @see hasClass
+     */
+    operator fun contains(clz: KClass<out E>): Boolean = clz in handlers
+    
+    /**
+     * Returns whether or not there's a [ListenerHandler] registered under the specified [clz].
+     *
+     * *Unlike the [contains] operator, this function accepts a star-projected [KClass]. (`KClass<*>`)*
+     *
+     * @see contains
+     */
+    fun hasClass(clz: KClass<*>): Boolean = handlers.any { (key) -> key.isInstance(clz) }
+    
+    /**
+     * Returns whether or not there's a [ListenerHandler] registered under the specified [C] type.
+     */
+    inline fun <reified C : Any> hasClass(): Boolean = hasClass(C::class)
+    
+    override fun iterator(): Iterator<ListenerHandler<E, L>> = handlers.values.toList().iterator()
     
     companion object {
         
@@ -273,28 +339,33 @@ class EventBus<E : Any, L : Any> private constructor(
         /**
          * Returns an [event-bus][EventBus] created from the given [eventClass] and [listenerClass].
          *
-         * @see eventBus
+         * @see eventBusOf
          */
         @JvmStatic
-        fun <E : Any, L : Any> create(eventClass: KClass<E>, listenerClass: KClass<L>): EventBus<E, L> =
+        fun <E : Any, L : Any> create(eventClass: KClass<out E>, listenerClass: KClass<out L>): EventBus<E, L> =
             EventBus(eventClass, listenerClass)
         
         /**
          * Returns an [event-bus][EventBus] created from the classes of the given [E] and [L].
          *
-         * @see eventBus
+         * @see eventBusOf
          */
-        // no static here because inline functions don't really exist in java, or even the jvm.
         inline fun <reified E : Any, reified L : Any> create(): EventBus<E, L> = create(E::class, L::class)
     }
 }
 
 interface EventExecutor<E : Any, L : Any> {
     
+    /**
+     * Fires the specified [event] to the specified [listener].
+     */
     fun fire(listener: L, event: E)
     
     interface Factory {
         
+        /**
+         * Creates the executor factory for the specified [bus] and [method].
+         */
         fun <E : Any, L : Any> create(bus: EventBus<E, L>, method: Method): EventExecutor<E, L>
         
     }
@@ -305,7 +376,7 @@ interface EventExecutor<E : Any, L : Any> {
  *
  * @see EventBus.create
  */
-fun <E : Any, L : Any> eventBus(eventClass: KClass<E>, listenerClass: KClass<L>): EventBus<E, L> =
+inline fun <E : Any, L : Any> eventBusOf(eventClass: KClass<out E>, listenerClass: KClass<out L>): EventBus<E, L> =
     EventBus.create(eventClass, listenerClass)
 
 /**
@@ -313,7 +384,7 @@ fun <E : Any, L : Any> eventBus(eventClass: KClass<E>, listenerClass: KClass<L>)
  *
  * @see EventBus.create
  */
-inline fun <reified E : Any, reified L : Any> eventBus(): EventBus<E, L> = EventBus.create(E::class, L::class)
+inline fun <reified E : Any, reified L : Any> eventBusOf(): EventBus<E, L> = EventBus.create(E::class, L::class)
 
 // Taken from kanon.kommons, got no interest in including that entire library just for one function.
 internal inline fun <reified A : Annotation> KAnnotatedElement.hasAnnotation(): Boolean =
