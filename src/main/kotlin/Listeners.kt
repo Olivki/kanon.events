@@ -46,7 +46,7 @@ import kotlin.reflect.jvm.jvmName
 /**
  * This class handles the storing and retrieval of all [registered-listeners][RegisteredListener].
  */
-open class ListenerHandler<E : Any, L : Any> {
+open class ListenerHandler<E : Any, L : Any> : Iterable<RegisteredListener<E, L>> {
     
     private val listeners: MutableSet<RegisteredListener<E, L>> = ConcurrentHashMap.newKeySet()
     
@@ -110,6 +110,8 @@ open class ListenerHandler<E : Any, L : Any> {
         listeners -= listener
         isUpdated = true
     }
+    
+    override fun iterator(): Iterator<RegisteredListener<E, L>> = listeners.toSet().iterator()
 }
 
 /**

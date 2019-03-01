@@ -101,4 +101,3 @@ gradle-app.setting
 
 !/appender.jar
 /src/test/kotlin/Test.kt
-/src/test/kotlin/EventTests.kt

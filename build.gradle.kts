@@ -17,7 +17,7 @@ plugins {
 // Project Specific Variables
 project.group = "moe.kanon.events"
 project.description = "Event handling with annotations for Kotlin."
-project.version = "0.1.0"
+project.version = "1.0.0"
 val artifactName = "kanon.events"
 val gitUrl = "https://gitlab.com/Olivki/kanon-events"
 
@@ -32,9 +32,11 @@ dependencies {
     implementation(kotlin("stdlib-jdk8"))
     implementation(kotlin("reflect"))
     implementation(group = "org.ow2.asm", name = "asm", version = "7.0")
+    implementation(group = "io.github.microutils", name = "kotlin-logging", version = "1.6.24")
     
     // Test Dependencies
     testImplementation(group = "io.kotlintest", name = "kotlintest-runner-junit5", version = "3.1.11")
+    testImplementation(group = "org.slf4j", name = "slf4j-simple", version = "1.8.0-beta2")
 }
 
 tasks.withType<KotlinCompile> {
