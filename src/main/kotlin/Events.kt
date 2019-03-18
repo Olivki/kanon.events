@@ -28,7 +28,7 @@
  * copies or substantial portions of the Software.
  */
 
-@file:JvmName("Events")
+@file:JvmName("EventFactory")
 @file:Suppress("NOTHING_TO_INLINE")
 
 // TODO Rename?
@@ -38,11 +38,13 @@ package moe.kanon.events
 import mu.KotlinLogging
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
+import java.util.function.Consumer
 import kotlin.reflect.KAnnotatedElement
 import kotlin.reflect.KClass
 import kotlin.reflect.full.allSuperclasses
 import kotlin.reflect.full.declaredMemberFunctions
 import kotlin.reflect.full.findAnnotation
+import kotlin.reflect.full.isSubclassOf
 
 /**
  * Represents a basic implementation of an event.
@@ -55,11 +57,13 @@ interface BasicEvent
  * Represents a basic implementation of a cancellable event.
  *
  * This class can be used as a parent for events that can be cancelled/interrupted during execution.
- *
- * @property [isCancelled] Whether or not the event is cancelled, if `true` the operation will generally terminate.
  */
 abstract class BasicCancellableEvent : BasicEvent {
     
+    /**
+     * Whether or not the event is cancelled, if `true` the event operation should generally terminate another
+     * operation.
+     */
     var isCancelled: Boolean = false
     
     /**
@@ -81,11 +85,13 @@ interface SynchronizedEvent
  * Represents a basic implementation of a cancellable synchronized event.
  *
  * This class can be used as a parent for events that can be cancelled/interrupted during execution.
- *
- * @property [isCancelled] Whether or not the event is cancelled, if `true` the operation will generally terminate.
  */
 abstract class SynchronizedCancellableEvent : SynchronizedEvent {
     
+    /**
+     * Whether or not the event is cancelled, if `true` the event operation should generally terminate another
+     * operation.
+     */
     var isCancelled: Boolean = false
     
     /**
@@ -154,9 +160,18 @@ class EventBus<E : Any, L : Any> private constructor(
     private val handlers: MutableMap<KClass<out E>, ListenerHandler<E, L>> = ConcurrentHashMap()
     
     /**
+     * Holds the [Consumer] instances.
+     *
+     * This is for locally registered event handlers.
+     */
+    private val consumers: MutableMap<KClass<out E>, MutableList<Consumer<E>>> = ConcurrentHashMap()
+    
+    /**
      * Returns how many listeners are registered.
      */
-    val size: Int @JvmName("size") get() = handlers.size
+    @get:JvmName("size")
+    val size: Int
+        get() = handlers.size
     
     /**
      * The logger used by the event-bus.
@@ -176,13 +191,13 @@ class EventBus<E : Any, L : Any> private constructor(
      * @return the event that was just fired.
      */
     fun fire(event: E): E {
+        val eventClz = event::class
         // If the given listener is somehow not an instance of the set eventClass, then just fail loudly.
-        require(eventClass.isInstance(event)) { "${event::class} is not a valid event, it needs to be an instance of $eventClass." }
+        require(eventClass.isInstance(event)) { "$eventClz is not a valid event, it needs to be an instance of $eventClass." }
         
-        logger.debug { "Firing event <$event>." }
-        
-        handlers[event::class]?.notify(event) // If it returns null it just means that there's no registered listener
+        handlers[eventClz]?.notify(event) // If it returns null it just means that there's no registered listener
         // that's waiting for that specific event, so we just don't do anything.
+        if (eventClz in consumers) for (consumer in consumers.getValue(eventClz)) consumer.accept(event)
         
         return event
     }
@@ -202,7 +217,6 @@ class EventBus<E : Any, L : Any> private constructor(
         
         if (listenerFuncs.isEmpty()) logger.debug { "<${listener::class}> has no listener functions." }
         
-        // because the .forEach {...} closure is slower than a normal loop.
         for (func in listenerFuncs) {
             val registeredListener =
                 RegisteredListener(this, listener, func, func.findAnnotation()!!) // We know that
@@ -213,6 +227,52 @@ class EventBus<E : Any, L : Any> private constructor(
             logger.info { "Registered <$listener> as an event-listener." }
         }
     }
+    
+    /**
+     * Registers the specified [consumer] as a local listener.
+     *
+     * This enables the following syntax:
+     *
+     * ```kotlin
+     *  val bus: EventBus<..., ...> = ...
+     *  bus.registerConsumer(EventClass::class, Consumer<EventClass> { event -> ... })
+     * ```
+     *
+     * For something that's more *idiomatic* Kotlin, see `inline` version.
+     *
+     * While this is a thing, it is heavily recommended to *only* use this for special circumstances, and the
+     * annotation way should still be used majority of the time, as this way is a lot slower and creates more overhead
+     * than the annotation way does.
+     */
+    fun registerConsumer(eventClz: KClass<out E>, consumer: Consumer<E>) {
+        require(eventClz.isSubclassOf(eventClass)) { "$eventClz is not a valid event, it needs to be an instance of $eventClass." }
+        
+        val handler = consumers.getOrPut(eventClz) { ArrayList() }
+        handler += consumer
+        consumers[eventClz] = handler
+        
+        logger.info { "Registered event consumer <$consumer>." }
+    }
+    
+    /**
+     * Registers the specified [consumer] as a local listener.
+     *
+     * This enables the following syntax:
+     *
+     * ```kotlin
+     *  val bus: EventBus<..., ...> = ...
+     *  bus.registerConsumer<EventClass> {
+     *      ...
+     *  }
+     * ```
+     *
+     * While this is a thing, it is heavily recommended to *only* use this for special circumstances, and the
+     * annotation way should still be used majority of the time, as this way is a lot slower and creates more overhead
+     * than the annotation way does.
+     */
+    @Suppress("UNCHECKED_CAST")
+    inline fun <reified C : E> registerConsumer(crossinline consumer: (C) -> Unit) =
+        registerConsumer(C::class, Consumer<C> { t -> consumer(t) } as Consumer<E>)
     
     /**
      * Converts the given [listener] into a [registered-listener][RegisteredListener] and then sends it to the
@@ -231,12 +291,11 @@ class EventBus<E : Any, L : Any> private constructor(
     fun <SE : SynchronizedEvent> registerSynchronized(listener: L) {
         // If the given listener is somehow not an instance of the set listenerClass, then just fail loudly.
         require(listenerClass.isInstance(listener)) { "Invalid listener type <${listener::class}>, expected: $listenerClass" }
-    
+        
         val listenerFuncs = listener::class.declaredMemberFunctions.filter { it.hasAnnotation<Subscribe>() }
-    
+        
         if (listenerFuncs.isEmpty()) logger.debug { "<${listener::class}> has no listener functions." }
         
-        // because the .forEach {...} closure is slower than a normal loop.
         for (func in listenerFuncs) {
             val registeredListener = RegisteredListener(this, listener, func, func.findAnnotation()!!) // We know that
             // the @Subscribe annotation is there because we filtered for it explicitly.
