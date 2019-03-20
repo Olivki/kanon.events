@@ -224,7 +224,7 @@ class EventBus<E : Any, L : Any> private constructor(
             val handler = handlers.computeIfAbsent(registeredListener.eventClass) { ListenerHandler() }
             
             handler.register(registeredListener)
-            logger.info { "Registered <$listener> as an event-listener." }
+            logger.info { "Registered <${listener::class}> as an event-listener." }
         }
     }
     
@@ -304,7 +304,7 @@ class EventBus<E : Any, L : Any> private constructor(
             }
             
             handler.register(registeredListener)
-            logger.info { "Registered <$listener> as a synchronized event-listener." }
+            logger.info { "Registered <${listener::class}> as a synchronized event-listener." }
         }
     }
     
@@ -384,6 +384,29 @@ class EventBus<E : Any, L : Any> private constructor(
     inline fun <reified C : Any> hasClass(): Boolean = hasClass(C::class)
     
     override fun iterator(): Iterator<ListenerHandler<E, L>> = handlers.values.toList().iterator()
+    
+    override fun equals(other: Any?): Boolean = when {
+        this === other -> true
+        other !is EventBus<*, *> -> false
+        eventClass != other.eventClass -> false
+        listenerClass != other.listenerClass -> false
+        handlers != other.handlers -> false
+        consumers != other.consumers -> false
+        logger != other.logger -> false
+        else -> true
+    }
+    
+    override fun hashCode(): Int {
+        var result = eventClass.hashCode()
+        result = 31 * result + listenerClass.hashCode()
+        result = 31 * result + handlers.hashCode()
+        result = 31 * result + consumers.hashCode()
+        result = 31 * result + logger.hashCode()
+        return result
+    }
+    
+    override fun toString(): String =
+        "EventBus(eventClass=$eventClass, listenerClass=$listenerClass, handlers=$handlers, consumers=$consumers)"
     
     companion object {
         
