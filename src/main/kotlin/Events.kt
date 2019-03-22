@@ -31,12 +31,13 @@
 @file:JvmName("EventFactory")
 @file:Suppress("NOTHING_TO_INLINE")
 
-// TODO Rename?
-
 package moe.kanon.events
 
 import mu.KotlinLogging
 import java.lang.reflect.Method
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Consumer
 import kotlin.reflect.KAnnotatedElement
@@ -49,22 +50,57 @@ import kotlin.reflect.full.isSubclassOf
 /**
  * Represents a basic implementation of an event.
  *
- * This interface itself holds no additional data, and should just be used to represent a specific subsets of events.
+ * The class itself holds no abstract values, but it is merely marked as `abstract` to make sure that it's only used
+ * for inheritance.
+ *
+ * It comes with two properties, a [timeMillis] which is set when an instance of it is created, and a lazily created
+ * [date] for a more clear representation of the date at which the event was created.
+ *
+ * @see BasicCancellableEvent
  */
-interface BasicEvent
+abstract class BasicEvent {
+    /**
+     * The [current time millis](https://currentmillis.com/) captured in the moment that `this` is fired.
+     */
+    val timeMillis: Long = System.currentTimeMillis()
+    
+    /**
+     * A lazily created [LocalDateTime] instance from the specified [timeMillis].
+     */
+    val date: LocalDateTime by lazy {
+        LocalDateTime.ofInstant(Instant.ofEpochMilli(timeMillis), ZoneId.systemDefault())
+    }
+    
+    /**
+     * Returns a string containing useful information for the creation of a `toString()` function for child-classes.
+     */
+    protected open val toString: String get() = "timeMillis=$timeMillis"
+    
+    override fun equals(other: Any?): Boolean = when {
+        this === other -> true
+        other !is BasicEvent -> false
+        timeMillis != other.timeMillis -> false
+        else -> true
+    }
+    
+    override fun hashCode(): Int = timeMillis.hashCode()
+    
+    override fun toString(): String = "BasicEvent($toString)"
+}
 
 /**
  * Represents a basic implementation of a cancellable event.
  *
  * This class can be used as a parent for events that can be cancelled/interrupted during execution.
  */
-abstract class BasicCancellableEvent : BasicEvent {
-    
+abstract class BasicCancellableEvent : BasicEvent() {
     /**
      * Whether or not the event is cancelled, if `true` the event operation should generally terminate another
      * operation.
      */
     var isCancelled: Boolean = false
+    
+    override val toString: String get() = "${super.toString}, isCancelled=$isCancelled"
     
     /**
      * Cancels the current event, terminating whatever operation it was wrapped around.
@@ -74,25 +110,78 @@ abstract class BasicCancellableEvent : BasicEvent {
     fun cancel() {
         isCancelled = true
     }
+    
+    override fun equals(other: Any?): Boolean = when {
+        this === other -> true
+        other !is BasicCancellableEvent -> false
+        !super.equals(other) -> false
+        isCancelled != other.isCancelled -> false
+        else -> true
+    }
+    
+    override fun hashCode(): Int {
+        var result = super.hashCode()
+        result = 31 * result + isCancelled.hashCode()
+        return result
+    }
+    
+    override fun toString(): String = "BasicCancellableEvent($toString)"
 }
 
 /**
  * Represents a basic implementation of a synchronized event.
+ *
+ * The class itself holds no abstract values, but it is merely marked as `abstract` to make sure that it's only used
+ * for inheritance.
+ *
+ * It comes with two properties, a [timeMillis] which is set when an instance of it is created, and a lazily created
+ * [date] for a more clear representation of the date at which the event was created.
+ *
+ * @see SynchronizedCancellableEvent
  */
-interface SynchronizedEvent
+abstract class SynchronizedEvent {
+    /**
+     * The [current time millis](https://currentmillis.com/) captured in the moment that `this` is fired.
+     */
+    val timeMillis: Long = System.currentTimeMillis()
+    
+    /**
+     * A lazily created [LocalDateTime] instance from the specified [timeMillis].
+     */
+    val date: LocalDateTime by lazy {
+        LocalDateTime.ofInstant(Instant.ofEpochMilli(timeMillis), ZoneId.systemDefault())
+    }
+    
+    /**
+     * Returns a string containing useful information for the creation of a `toString()` function for child-classes.
+     */
+    protected open val toString: String get() = "timeMillis=$timeMillis"
+    
+    override fun equals(other: Any?): Boolean = when {
+        this === other -> true
+        other !is SynchronizedEvent -> false
+        timeMillis != other.timeMillis -> false
+        else -> true
+    }
+    
+    override fun hashCode(): Int = timeMillis.hashCode()
+    
+    override fun toString(): String = "SynchronizedEvent($toString)"
+}
 
 /**
  * Represents a basic implementation of a cancellable synchronized event.
  *
  * This class can be used as a parent for events that can be cancelled/interrupted during execution.
  */
-abstract class SynchronizedCancellableEvent : SynchronizedEvent {
-    
+abstract class SynchronizedCancellableEvent : SynchronizedEvent() {
     /**
      * Whether or not the event is cancelled, if `true` the event operation should generally terminate another
      * operation.
      */
     var isCancelled: Boolean = false
+    
+    override val toString: String get() = "${super.toString}, isCancelled=$isCancelled"
     
     /**
      * Cancels the current event, terminating whatever operation it was wrapped around.
@@ -102,6 +191,22 @@ abstract class SynchronizedCancellableEvent : SynchronizedEvent {
     fun cancel() {
         isCancelled = true
     }
+    
+    override fun equals(other: Any?): Boolean = when {
+        this === other -> true
+        other !is SynchronizedCancellableEvent -> false
+        !super.equals(other) -> false
+        isCancelled != other.isCancelled -> false
+        else -> true
+    }
+    
+    override fun hashCode(): Int {
+        var result = super.hashCode()
+        result = 31 * result + isCancelled.hashCode()
+        return result
+    }
+    
+    override fun toString(): String = "SynchronizedCancellableEvent($toString)"
 }
 
 /**
