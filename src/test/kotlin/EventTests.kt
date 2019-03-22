@@ -43,10 +43,10 @@ import moe.kanon.events.EventPriority
 import moe.kanon.events.Subscribe
 
 // basic events for testing purposes
-data class AssertionEvent(var success: Boolean) : BasicEvent
+data class AssertionEvent(var success: Boolean) : BasicEvent()
 
-data class PriorityEvent(var value: Int) : BasicEvent
-class EmptyEvent : BasicEvent
+data class PriorityEvent(var value: Int) : BasicEvent()
+class EmptyEvent : BasicEvent()
 
 class InvokeEventHandlerFunctionTest : ExpectSpec({
     val bus = EventBus.default
