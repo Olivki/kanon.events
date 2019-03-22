@@ -295,7 +295,7 @@ class EventBus<E : Any, L : Any> private constructor(
      *
      * @return the event that was just fired.
      */
-    fun fire(event: E): E {
+    fun <ET : E> fire(event: ET): ET {
         val eventClz = event::class
         // If the given listener is somehow not an instance of the set eventClass, then just fail loudly.
         require(eventClass.isInstance(event)) { "$eventClz is not a valid event, it needs to be an instance of $eventClass." }
