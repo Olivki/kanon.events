@@ -313,10 +313,13 @@ class EventBus<E : Any, L : Any> private constructor(
      *
      * @param [listener] The object to convert into a [registered-listener][RegisteredListener].
      */
+    @Suppress("UNCHECKED_CAST")
     @Throws(IllegalArgumentException::class)
     fun register(listener: L) {
         // If the given listener is somehow not an instance of the set listenerClass, then just fail loudly.
         require(listenerClass.isInstance(listener)) { "Invalid listener type: ${listener::class}, needs to be instance of $listenerClass." }
+        
+        if (handlers.containsKey(listener::class as KClass<out E>) || consumers.containsKey(listener::class as KClass<out E>)) return
         
         val listenerFuncs = listener::class.declaredMemberFunctions.filter { it.hasAnnotation<Subscribe>() }
         
@@ -329,8 +332,9 @@ class EventBus<E : Any, L : Any> private constructor(
             val handler = handlers.computeIfAbsent(registeredListener.eventClass) { ListenerHandler() }
             
             handler.register(registeredListener)
-            logger.info { "Registered <${listener::class}> as an event-listener." }
         }
+    
+        logger.info { "Registered <${listener::class}> as an event-listener." }
     }
     
     /**
@@ -409,8 +413,9 @@ class EventBus<E : Any, L : Any> private constructor(
             }
             
             handler.register(registeredListener)
-            logger.info { "Registered <${listener::class}> as a synchronized event-listener." }
         }
+    
+        logger.info { "Registered <${listener::class}> as a synchronized event-listener." }
     }
     
     /**
