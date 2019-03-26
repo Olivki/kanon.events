@@ -446,8 +446,9 @@ class EventBus<E : Any, L : Any> private constructor(
             
             // We know that it won't be null, because we already checked that the map contained the key.
             handlers[registeredListener.eventClass]!! -= registeredListener
-            logger.info { "Unregistered <$listener> as an event-listener." }
         }
+    
+        logger.info { "Unregistered <${listener::class}> as an event-listener" }
     }
     
     /**
