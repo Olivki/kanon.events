@@ -17,7 +17,7 @@ plugins {
 // Project Specific Variables
 project.group = "moe.kanon.events"
 project.description = "Event handling with annotations for Kotlin."
-project.version = "1.3.0"
+project.version = "1.3.1"
 val artifactName = "kanon.events"
 val gitUrl = "https://gitlab.com/Olivki/kanon-events"
 
