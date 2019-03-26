@@ -334,7 +334,7 @@ class EventBus<E : Any, L : Any> private constructor(
             handler.register(registeredListener)
         }
     
-        logger.info { "Registered <${listener::class}> as an event-listener." }
+        logger.debug { "Registered <${listener::class}> as an event-listener." }
     }
     
     /**
@@ -417,7 +417,7 @@ class EventBus<E : Any, L : Any> private constructor(
             handler.register(registeredListener)
         }
     
-        logger.info { "Registered <${listener::class}> as a synchronized event-listener." }
+        logger.debug { "Registered <${listener::class}> as a synchronized event-listener." }
     }
     
     /**
@@ -452,7 +452,7 @@ class EventBus<E : Any, L : Any> private constructor(
             handlers[registeredListener.eventClass]!! -= registeredListener
         }
     
-        logger.info { "Unregistered <${listener::class}> as an event-listener" }
+        logger.debug { "Unregistered <${listener::class}> as an event-listener" }
     }
     
     /**
