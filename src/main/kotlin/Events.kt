@@ -318,8 +318,8 @@ class EventBus<E : Any, L : Any> private constructor(
     fun register(listener: L) {
         // If the given listener is somehow not an instance of the set listenerClass, then just fail loudly.
         require(listenerClass.isInstance(listener)) { "Invalid listener type: ${listener::class}, needs to be instance of $listenerClass." }
-        
-        if (handlers.containsKey(listener::class as KClass<out E>) || consumers.containsKey(listener::class as KClass<out E>)) return
+    
+        if (isListener(listener)) return
         
         val listenerFuncs = listener::class.declaredMemberFunctions.filter { it.hasAnnotation<Subscribe>() }
         
@@ -401,6 +401,8 @@ class EventBus<E : Any, L : Any> private constructor(
         // If the given listener is somehow not an instance of the set listenerClass, then just fail loudly.
         require(listenerClass.isInstance(listener)) { "Invalid listener type <${listener::class}>, expected: $listenerClass" }
         
+        if (isListener(listener)) return
+        
         val listenerFuncs = listener::class.declaredMemberFunctions.filter { it.hasAnnotation<Subscribe>() }
         
         if (listenerFuncs.isEmpty()) logger.debug { "<${listener::class}> has no listener functions." }
@@ -438,6 +440,8 @@ class EventBus<E : Any, L : Any> private constructor(
     fun unregister(listener: L) {
         require(listenerClass.isInstance(listener)) { "Invalid listener type <${listener::class.allSuperclasses}>, expected: <$listenerClass>." }
         
+        if (!isListener(listener)) return
+        
         for (func in listener::class.declaredMemberFunctions.filter { it.hasAnnotation<Subscribe>() }) {
             val registeredListener = RegisteredListener(this, listener, func, func.findAnnotation()!!) // We know that
             // the @Subscribe annotation is there because we filtered for it explicitly.
@@ -446,8 +450,9 @@ class EventBus<E : Any, L : Any> private constructor(
             
             // We know that it won't be null, because we already checked that the map contained the key.
             handlers[registeredListener.eventClass]!! -= registeredListener
-            logger.info { "Unregistered <$listener> as an event-listener." }
         }
+    
+        logger.info { "Unregistered <${listener::class}> as an event-listener" }
     }
     
     /**
@@ -492,6 +497,23 @@ class EventBus<E : Any, L : Any> private constructor(
      * Returns whether or not there's a [ListenerHandler] registered under the specified [C] type.
      */
     inline fun <reified C : Any> hasClass(): Boolean = hasClass(C::class)
+    
+    /**
+     * Returns whether or not the specified [listener] is a registered listener in any of the [handlers].
+     */
+    fun isListener(listener: L): Boolean = handlers.values.any { it.isListener(listener) }
+    
+    /**
+     * Returns whether or not the specified [listener] is a registered listener in any of the [handlers].
+     */
+    fun isListener(listener: KClass<L>): Boolean = handlers.values.any { it.isListener(listener) }
+    
+    /**
+     * Returns whether or not the specified [listener][LI] is a registered listener in any of the [handlers].
+     */
+    @JvmSynthetic
+    @Suppress("UNCHECKED_CAST")
+    inline fun <reified LI : L> isListener(): Boolean = isListener(LI::class as KClass<L>)
     
     override fun iterator(): Iterator<ListenerHandler<E, L>> = handlers.values.toList().iterator()
     
