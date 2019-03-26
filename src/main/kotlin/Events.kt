@@ -360,7 +360,7 @@ class EventBus<E : Any, L : Any> private constructor(
         handler += consumer
         consumers[eventClz] = handler
         
-        logger.info { "Registered event consumer <$consumer>." }
+        logger.debug { "Registered event consumer <$consumer>." }
     }
     
     /**
