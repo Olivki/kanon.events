@@ -31,6 +31,7 @@
 package moe.kanon.tests
 
 import io.kotlintest.fail
+import io.kotlintest.matchers.boolean.shouldBeFalse
 import io.kotlintest.matchers.boolean.shouldBeTrue
 import io.kotlintest.matchers.string.shouldContainIgnoringCase
 import io.kotlintest.shouldBe
@@ -73,6 +74,32 @@ class InvokeEventHandlerFunctionTest : ExpectSpec({
     }
 })
 
+class IsListenerTest : ExpectSpec({
+    val bus = EventBus.default
+    
+    class EventListener {
+        @Subscribe
+        fun `is listener test`(event: EmptyEvent) {
+            fail("for checking")
+        }
+    }
+    
+    context("checking whether or not a class is registered as a listener") {
+        expect("that the function should return the correct values") {
+            val listener = EventListener()
+            
+            bus.register(listener)
+            bus.isListener<EventListener>().shouldBeTrue()
+            
+            // make sure that the listener event accepts the event in the first place.
+            shouldFail { bus.fire(EmptyEvent()) }
+            
+            bus.unregister(listener)
+            bus.isListener<EventListener>().shouldBeFalse()
+        }
+    }
+})
+
 class UnregisterEventListenerTest : ExpectSpec({
     val bus = EventBus.default
     
@@ -88,9 +115,11 @@ class UnregisterEventListenerTest : ExpectSpec({
             val listener = EventListener()
             
             bus.register(listener)
+            bus.isListener<EventListener>().shouldBeTrue()
             // make sure that the listener event accepts the event in the first place.
             shouldFail { bus.fire(EmptyEvent()) }
             bus.unregister(listener)
+            bus.isListener<EventListener>().shouldBeFalse()
             bus.fire(EmptyEvent())
         }
     }

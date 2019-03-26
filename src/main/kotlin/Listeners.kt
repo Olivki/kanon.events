@@ -58,6 +58,23 @@ open class ListenerHandler<E : Any, L : Any> : Iterable<RegisteredListener<E, L>
     private var isUpdated: Boolean = true
     
     /**
+     * Returns whether or not the specified [listener] is a registered listener in `this` handler.
+     */
+    fun isListener(listener: L): Boolean = listeners.any { it.listener::class == listener::class }
+    
+    /**
+     * Returns whether or not the specified [listener] is a registered listener in `this` handler.
+     */
+    fun isListener(listener: KClass<L>): Boolean = listeners.any { it.listener::class == listener }
+    
+    /**
+     * Returns whether or not the specified [listener][LI] is a registered listener in `this` handler.
+     */
+    @JvmSynthetic
+    @Suppress("UNCHECKED_CAST")
+    inline fun <reified LI : L> isListener(): Boolean = isListener(LI::class as KClass<L>)
+    
+    /**
      * Notifies all registered `listeners` that an event has been fired.
      *
      * The `listeners` get notified in the order of their priority.
