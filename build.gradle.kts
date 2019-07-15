@@ -1,4 +1,3 @@
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import name.remal.gradle_plugins.plugins.publish.bintray.RepositoryHandlerBintrayExtension
 import name.remal.gradle_plugins.dsl.extensions.*
@@ -15,8 +14,6 @@ buildscript {
 
 plugins {
     kotlin("jvm").version("1.3.41")
-
-    id("com.github.johnrengelman.shadow").version("4.0.4")
 
     `maven-publish`
 }
@@ -48,13 +45,6 @@ tasks {
     withType<KotlinCompile> {
         kotlinOptions.jvmTarget = "1.8"
     }
-
-    val shadowJar = named<ShadowJar>("shadowJar") {
-        relocate("net.bytebuddy", "moe.kanon.events.internal.net.bytebuddy")
-        minimize()
-    }
-
-    get("build").dependsOn(shadowJar)
 }
 
 project.afterEvaluate {
