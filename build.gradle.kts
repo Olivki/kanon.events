@@ -79,6 +79,6 @@ project.afterEvaluate {
     publishing.repositories.convention[RepositoryHandlerBintrayExtension::class.java].bintray {
         owner = "olivki"
         repositoryName = "kanon"
-        packageName = project.group.toString()
+        packageName = "kanon.events"
     }
 }
