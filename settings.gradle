@@ -1,2 +1,4 @@
+include("checker")
+
 rootProject.name = 'kanon.events'
 enableFeaturePreview('STABLE_PUBLISHING')
