@@ -1,4 +1,6 @@
-## kanon.events ![https://api.bintray.com/packages/olivki/kanon/kanon.events/images/download.svg](https://bintray.com/olivki/kanon/kanon.events/_latestVersion)
+## kanon.events 
+
+[![Download](https://api.bintray.com/packages/olivki/kanon/kanon.events/images/download.svg)](https://bintray.com/olivki/kanon/kanon.events/_latestVersion)
 
 Annotation based [publish-subscribe](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) style event handling for Kotlin and Java.
 
