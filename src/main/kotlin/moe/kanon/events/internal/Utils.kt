@@ -16,9 +16,13 @@
 
 package moe.kanon.events.internal
 
+import net.bytebuddy.description.type.TypeDescription
 import kotlin.reflect.KAnnotatedElement
 import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
+
+internal typealias TypeFactory = TypeDescription.Generic.Builder
+internal typealias GenericType = TypeDescription.Generic
 
 @PublishedApi
 internal val KParameter.clz: KClass<*>
