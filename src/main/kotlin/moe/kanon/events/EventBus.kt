@@ -250,7 +250,6 @@ data class EventBus<E : Any, L : Any> private constructor(
                         ).build()
                     )
                     .method(named("fire"))
-                    .also { println(func) }
                     .intercept(MethodCall.invoke(func.javaMethod).onArgument(0).withArgument(1))
                     .make()
                     .load(this.javaClass.classLoader, ClassLoadingStrategy.Default.WRAPPER)
@@ -269,7 +268,6 @@ data class EventBus<E : Any, L : Any> private constructor(
                 func: KFunction<Unit>
             ): EventExecutor<E, L> {
                 bus.requireValidListener(func)
-                println(func.javaMethod!!.declaringClass)
                 val executorClass = cache.computeIfAbsent(func) { generateExecutor(it) }
                 return try {
                     executorClass.createInstance() as EventExecutor<E, L>
