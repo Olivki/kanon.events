@@ -22,7 +22,7 @@ apply(plugin = "name.remal.maven-publish-bintray")
 
 project.group = "moe.kanon.events"
 project.description = "EventBus based event handler for Kotlin"
-project.version = "2.0.1"
+project.version = "2.0.2"
 val gitUrl = "https://gitlab.com/Olivki/kanon-events"
 
 repositories {

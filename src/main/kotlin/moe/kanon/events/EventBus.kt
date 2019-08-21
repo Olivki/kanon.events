@@ -252,7 +252,7 @@ data class EventBus<E : Any, L : Any> private constructor(
                     .method(named("fire"))
                     .intercept(MethodCall.invoke(func.javaMethod).onArgument(0).withArgument(1))
                     .make()
-                    .load(this.javaClass.classLoader, ClassLoadingStrategy.Default.WRAPPER)
+                    .load(func.javaMethod!!.declaringClass.classLoader, ClassLoadingStrategy.Default.WRAPPER)
                     .loaded.kotlin as KClass<out EventExecutor<*, *>>
 
             /**
