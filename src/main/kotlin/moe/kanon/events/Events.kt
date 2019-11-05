@@ -31,19 +31,6 @@ import java.time.ZoneId
  */
 abstract class Event {
     /**
-     * Returns the [current time millis](https://currentmillis.com/) that was captured the moment `this` event was
-     * created.
-     */
-    val timeMillis: Long = System.currentTimeMillis()
-
-    /**
-     * Lazily returns a [LocalDateTime] instance based on the captured [timeMillis].
-     */
-    val creationDate: LocalDateTime by lazy {
-        LocalDateTime.ofInstant(Instant.ofEpochMilli(timeMillis), ZoneId.systemDefault())
-    }
-
-    /**
      * Lazily looks up the [simple class name][Class.getSimpleName] of `this` event and then stores it.
      *
      * This is so that [toString] will return an accurate class name if a class inherits from this without providing
@@ -51,16 +38,7 @@ abstract class Event {
      */
     protected val simpleClassName: String by lazy { javaClass.simpleName }
 
-    override fun equals(other: Any?): Boolean = when {
-        this === other -> true
-        other !is Event -> false
-        timeMillis != other.timeMillis -> false
-        else -> true
-    }
-
-    override fun hashCode(): Int = timeMillis.hashCode()
-
-    override fun toString(): String = "$simpleClassName(timeMillis=$timeMillis)"
+    override fun toString(): String = "$simpleClassName()"
 }
 
 /**
@@ -99,5 +77,5 @@ abstract class CancellableEvent : Event() {
         return result
     }
 
-    override fun toString(): String = "$simpleClassName(timeMillis=$timeMillis, isCancelled=$isCancelled)"
+    override fun toString(): String = "$simpleClassName(isCancelled=$isCancelled)"
 }
