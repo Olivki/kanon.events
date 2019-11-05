@@ -22,8 +22,6 @@ import moe.kanon.events.internal.TypeFactory
 import moe.kanon.events.internal.clz
 import moe.kanon.events.internal.hasAnnotation
 import moe.kanon.events.internal.requireValidListener
-import mu.KLogger
-import mu.KotlinLogging
 import net.bytebuddy.ByteBuddy
 import net.bytebuddy.NamingStrategy
 import net.bytebuddy.description.type.TypeDescription
@@ -44,6 +42,8 @@ import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.valueParameters
 import kotlin.reflect.jvm.javaMethod
 import moe.kanon.events.internal.InvalidListenerFunctionException
+import org.apache.logging.log4j.kotlin.KotlinLogger
+import org.apache.logging.log4j.kotlin.logger
 
 /**
  * An implementation of the [publish-subscribe pattern](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern).
@@ -57,70 +57,13 @@ import moe.kanon.events.internal.InvalidListenerFunctionException
  * @property [name] The name that the [logger] should use.
  */
 @Suppress("DataClassPrivateConstructor")
-data class EventBus<E : Any, L : Any> private constructor(
+class EventBus<E : Any, L : Any> private constructor(
     val eventClass: KClass<out E>,
     val listenerClass: KClass<out L>,
     val strategy: InvocationStrategy = InvocationStrategy.ASM,
     private val name: String = "EventBus"
 ) {
-    companion object {
-        /**
-         * Returns a default implementation of an event-bus, where all events need to be sub-classes of [Event]
-         * and the listeners can be anything as long as they inherit from [Any], and the [strategy] used is the
-         * [ASM][InvocationStrategy.ASM] one.
-         */
-        val default: EventBus<Event, Any>
-            @JvmStatic get() = EventBus(InvocationStrategy.ASM)
-
-        /**
-         * Returns a new [EventBus] using the given arguments.
-         *
-         * @param [eventClass] the super-class that all events sent through the bus inherit from
-         * @param [listenerClass] the super-class that all listeners registered to the bus inherit from
-         * @param [strategy] the [InvocationStrategy] that the bus will use for invoking the listener functions
-         * registered to it
-         * @param [name] the name that the underlying [logger][EventBus.logger] uses
-         */
-        @JvmOverloads @JvmStatic fun <E : Any, L : Any> newInstance(
-            eventClass: Class<E>,
-            listenerClass: Class<L>,
-            strategy: InvocationStrategy = InvocationStrategy.ASM,
-            name: String = "EventBus"
-        ): EventBus<E, L> = EventBus(eventClass.kotlin, listenerClass.kotlin, strategy, name)
-
-        /**
-         * Returns a new [EventBus] using the given arguments.
-         *
-         * @param [eventClass] the super-class that all events sent through the bus inherit from
-         * @param [listenerClass] the super-class that all listeners registered to the bus inherit from
-         * @param [strategy] the [InvocationStrategy] that the bus will use for invoking the listener functions
-         * registered to it
-         * @param [name] the name that the underlying [logger][EventBus.logger] uses
-         */
-        @JvmName("newInstance")
-        operator fun <E : Any, L : Any> invoke(
-            eventClass: KClass<E>,
-            listenerClass: KClass<L>,
-            strategy: InvocationStrategy = InvocationStrategy.ASM,
-            name: String = "EventBus"
-        ): EventBus<E, L> = EventBus(eventClass, listenerClass, strategy, name)
-
-        /**
-         * Returns a new [EventBus] using the given arguments.
-         *
-         * @param [EventType] the super-type that all events sent through the bus inherits from
-         * @param [ListenerType] the super-type that all listeners registered to the bus inherits from
-         * @param [strategy] the [InvocationStrategy] that the bus will use for invoking the listener functions
-         * registered to it
-         * @param [name] the name that the underlying [logger][EventBus.logger] uses
-         */
-        @JvmSynthetic inline operator fun <reified EventType : Any, reified ListenerType : Any> invoke(
-            strategy: InvocationStrategy = InvocationStrategy.ASM,
-            name: String = "EventBus"
-        ): EventBus<EventType, ListenerType> = invoke(EventType::class, ListenerType::class, strategy, name)
-    }
-
-    private val logger: KLogger = KotlinLogging.logger(name)
+    private val logger: KotlinLogger = logger(name)
 
     private val repos: MutableMap<KClass<out E>, ListenerRepository<E, L>> = ConcurrentHashMap()
 
@@ -145,13 +88,20 @@ data class EventBus<E : Any, L : Any> private constructor(
     fun register(listener: L) {
         require(listenerClass.isInstance(listener)) { "<${listener::class}> is not a sub-class of <$listenerClass>" }
 
-        if (listener in this) return logger.debug { "<${listener::class}> is already registered" }
+        if (listener in this) {
+            logger.warn { "<${listener::class}> is already a registered listener for $this" }
+            return
+        }
 
-        val functions = listener::class.declaredMemberFunctions.asSequence()
+        val functions = listener::class.declaredMemberFunctions
+            .asSequence()
             .filterIsInstance<KFunction<Unit>>()
             .filter { it.hasAnnotation<Subscribed>() }
 
-        if (functions.none()) return logger.debug { "<${listener::class}> has no listener functions" }
+        if (functions.none()) {
+            logger.info { "<${listener::class}> has no listener functions" }
+            return
+        }
 
         for (func in functions) {
             val wrapper = ListenerWrapper(
@@ -164,7 +114,7 @@ data class EventBus<E : Any, L : Any> private constructor(
             repos.computeIfAbsent(wrapper.eventClass) { ListenerRepository() }.register(wrapper)
         }
 
-        logger.debug { "Registered event listener <${listener::class}>" }
+        logger.debug { "Registered event listener <${listener::class}> to $this" }
     }
 
     /**
@@ -175,9 +125,13 @@ data class EventBus<E : Any, L : Any> private constructor(
     fun unregister(listener: L) {
         require(listenerClass.isInstance(listener)) { "<${listener::class}> is not a sub-class of <$listenerClass>" }
 
-        if (listener !in this) return logger.debug { "<${listener::class}> is not a registered listener" }
+        if (listener !in this) {
+            logger.warn { "<${listener::class}> is not a registered listener for $this" }
+            return
+        }
 
-        listener::class.declaredMemberFunctions.asSequence()
+        listener::class.declaredMemberFunctions
+            .asSequence()
             .filterIsInstance<KFunction<Unit>>()
             .filter { it.hasAnnotation<Subscribed>() }
             .map { func ->
@@ -197,9 +151,6 @@ data class EventBus<E : Any, L : Any> private constructor(
 
     /**
      * Fires the given [event] to any registered listeners.
-     *
-     * Note that if no listeners are found, and [eventClass] is of type [Event] then a [DeadEvent] will be sent out,
-     * wrapping around the given [event].
      *
      * @return the given [event]
      */
@@ -225,7 +176,31 @@ data class EventBus<E : Any, L : Any> private constructor(
     /**
      * Returns whether or not the given [listener][Listener] is a registered listener in `this` event-bus.
      */
-    @JvmSynthetic inline fun <reified Listener : L> isListener(): Boolean = Listener::class in this
+    @JvmSynthetic
+    inline fun <reified Listener : L> isListener(): Boolean = Listener::class in this
+
+    override fun equals(other: Any?): Boolean = when {
+        this === other -> true
+        other !is EventBus<*, *> -> false
+        eventClass != other.eventClass -> false
+        listenerClass != other.listenerClass -> false
+        strategy != other.strategy -> false
+        name != other.name -> false
+        repos != other.repos -> false
+        else -> true
+    }
+
+    override fun hashCode(): Int {
+        var result = eventClass.hashCode()
+        result = 31 * result + listenerClass.hashCode()
+        result = 31 * result + strategy.hashCode()
+        result = 31 * result + name.hashCode()
+        result = 31 * result + repos.hashCode()
+        return result
+    }
+
+    override fun toString(): String =
+        "EventBus(eventClass=$eventClass, listenerClass=$listenerClass, strategy=$strategy, name='$name')"
 
     /**
      * Represents different ways that an event-bus can go about executing the registered listener functions.
@@ -263,7 +238,8 @@ data class EventBus<E : Any, L : Any> private constructor(
              * that even if the same parameters are passed to this function, there is no guarantee that the resulting
              * instances will be considered the same.
              */
-            @JvmSynthetic override fun <E : Any, L : Any> create(
+            @JvmSynthetic
+            override fun <E : Any, L : Any> create(
                 bus: EventBus<E, L>,
                 func: KFunction<Unit>
             ): EventExecutor<E, L> {
@@ -282,7 +258,8 @@ data class EventBus<E : Any, L : Any> private constructor(
          * Represents a strategy where simple reflection is utilized to invoke the registered listener functions.
          */
         REFLECTION {
-            @JvmSynthetic override fun <E : Any, L : Any> create(
+            @JvmSynthetic
+            override fun <E : Any, L : Any> create(
                 bus: EventBus<E, L>,
                 func: KFunction<Unit>
             ): EventExecutor<E, L> = object : EventExecutor<E, L> {
@@ -303,7 +280,8 @@ data class EventBus<E : Any, L : Any> private constructor(
          * functions.
          */
         METHOD_HANDLE {
-            @JvmSynthetic override fun <E : Any, L : Any> create(
+            @JvmSynthetic
+            override fun <E : Any, L : Any> create(
                 bus: EventBus<E, L>,
                 func: KFunction<Unit>
             ): EventExecutor<E, L> = object : EventExecutor<E, L> {
@@ -328,10 +306,71 @@ data class EventBus<E : Any, L : Any> private constructor(
          *
          * How the event-executor varies from implementation to implementation.
          */
-        @JvmSynthetic internal abstract fun <E : Any, L : Any> create(
+        @JvmSynthetic
+        internal abstract fun <E : Any, L : Any> create(
             bus: EventBus<E, L>,
             func: KFunction<Unit>
         ): EventExecutor<E, L>
+    }
+
+    companion object {
+        /**
+         * Returns a default implementation of an event-bus, where all events need to be sub-classes of [Event]
+         * and the listeners can be anything as long as they inherit from [Any], and the [strategy] used is the
+         * [ASM][InvocationStrategy.ASM] one.
+         */
+        val default: EventBus<Event, Any>
+            @JvmStatic get() = EventBus(InvocationStrategy.ASM)
+
+        /**
+         * Returns a new [EventBus] using the given arguments.
+         *
+         * @param [eventClass] the super-class that all events sent through the bus inherit from
+         * @param [listenerClass] the super-class that all listeners registered to the bus inherit from
+         * @param [strategy] the [InvocationStrategy] that the bus will use for invoking the listener functions
+         * registered to it
+         * @param [name] the name that the underlying [logger][EventBus.logger] uses
+         */
+        @JvmStatic
+        @JvmOverloads
+        fun <E : Any, L : Any> newInstance(
+            eventClass: Class<E>,
+            listenerClass: Class<L>,
+            strategy: InvocationStrategy = InvocationStrategy.ASM,
+            name: String = "EventBus"
+        ): EventBus<E, L> = EventBus(eventClass.kotlin, listenerClass.kotlin, strategy, name)
+
+        /**
+         * Returns a new [EventBus] using the given arguments.
+         *
+         * @param [eventClass] the super-class that all events sent through the bus inherit from
+         * @param [listenerClass] the super-class that all listeners registered to the bus inherit from
+         * @param [strategy] the [InvocationStrategy] that the bus will use for invoking the listener functions
+         * registered to it
+         * @param [name] the name that the underlying [logger][EventBus.logger] uses
+         */
+        @JvmName("newInstance")
+        operator fun <E : Any, L : Any> invoke(
+            eventClass: KClass<E>,
+            listenerClass: KClass<L>,
+            strategy: InvocationStrategy = InvocationStrategy.ASM,
+            name: String = "EventBus"
+        ): EventBus<E, L> = EventBus(eventClass, listenerClass, strategy, name)
+
+        /**
+         * Returns a new [EventBus] using the given arguments.
+         *
+         * @param [E] the super-type that all events sent through the bus inherits from
+         * @param [L] the super-type that all listeners registered to the bus inherits from
+         * @param [strategy] the [InvocationStrategy] that the bus will use for invoking the listener functions
+         * registered to it
+         * @param [name] the name that the underlying [logger][EventBus.logger] uses
+         */
+        @JvmSynthetic
+        inline operator fun <reified E : Any, reified L : Any> invoke(
+            strategy: InvocationStrategy = InvocationStrategy.ASM,
+            name: String = "EventBus"
+        ): EventBus<E, L> = invoke(E::class, L::class, strategy, name)
     }
 }
 
@@ -432,6 +471,22 @@ private class ListenerRepository<E : Any, L : Any> {
      * Returns whether or not the given [listener] is a registered listener in `this` repository.
      */
     fun isListener(listener: KClass<out L>): Boolean = listeners.any { it.listener::class == listener }
+
+    override fun equals(other: Any?): Boolean = when {
+        this === other -> true
+        other !is ListenerRepository<*, *> -> false
+        listeners != other.listeners -> false
+        cachedListeners != other.cachedListeners -> false
+        hasChanged != other.hasChanged -> false
+        else -> true
+    }
+
+    override fun hashCode(): Int {
+        var result = listeners.hashCode()
+        result = 31 * result + cachedListeners.hashCode()
+        result = 31 * result + hasChanged.hashCode()
+        return result
+    }
 }
 
 /**
