@@ -14,20 +14,24 @@
  * limitations under the License.
  */
 
-package moe.kanon.events.internal
+package moe.kanon.events
 
-import net.bytebuddy.description.type.TypeDescription
-import kotlin.reflect.KAnnotatedElement
-import kotlin.reflect.KClass
-import kotlin.reflect.KParameter
-
-internal typealias TypeFactory = TypeDescription.Generic.Builder
-internal typealias GenericType = TypeDescription.Generic
-
-@PublishedApi
-internal val KParameter.clz: KClass<*>
-    get() = this.type.classifier as KClass<*>
-
-@PublishedApi
-internal inline fun <reified A : Annotation> KAnnotatedElement.hasAnnotation(): Boolean =
-    this.annotations.any { it is A }
+/**
+ * Houses the different priorities available for the listener functions.
+ *
+ * The priority is determined by the [ordinal][Enum.ordinal] of the enum, i.e;
+ *
+ * `LOWEST` has a priority of `0`.
+ *
+ * `HIGHEST` has a priority of `4`.
+ *
+ * etc...
+ */
+enum class EventPriority {
+    LOWEST,
+    LOW,
+    NORMAL,
+    HIGH,
+    HIGHEST,
+    OBSERVER
+}

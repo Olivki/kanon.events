@@ -30,22 +30,3 @@ import moe.kanon.events.internal.InvalidListenerFunctionException
 @Target(AnnotationTarget.FUNCTION)
 annotation class Subscribed(val priority: EventPriority = EventPriority.NORMAL)
 
-/**
- * Houses the different priorities available for the listener functions.
- *
- * The priority is determined by the [ordinal][Enum.ordinal] of the enum, i.e;
- *
- * `LOWEST` has a priority of `0`.
- *
- * `HIGHEST` has a priority of `4`.
- *
- * etc...
- */
-enum class EventPriority {
-    LOWEST,
-    LOW,
-    NORMAL,
-    HIGH,
-    HIGHEST,
-    OBSERVER
-}

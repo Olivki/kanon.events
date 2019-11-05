@@ -102,3 +102,5 @@ gradle-app.setting
 !/appender.jar
 /src/test/kotlin/Test.kt
 /src/test/kotlin/moe/kanon/events/Ugly.kt
+/benchmark/
+/checker/build/

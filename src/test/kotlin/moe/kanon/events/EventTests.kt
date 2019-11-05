@@ -35,7 +35,8 @@ class InvokeEventListenerFunctionTest : ExpectSpec({
     val bus = EventBus.default
 
     class EventListener {
-        @Subscribed fun `event-handler function invocation test`(event: AssertionEvent) {
+        @Subscribed
+        fun `event-handler function invocation test`(event: AssertionEvent) {
             event.success shouldBe false
             event.success = true
         }
@@ -59,7 +60,8 @@ class IsListenerTest : ExpectSpec({
     val bus = EventBus.default
 
     class EventListener {
-        @Subscribed fun `is listener test`(event: EmptyEvent) {
+        @Subscribed
+        fun `is listener test`(event: EmptyEvent) {
             fail("for checking")
         }
     }
@@ -84,7 +86,8 @@ class UnregisterEventListenerTest : ExpectSpec({
     val bus = EventBus.default
 
     class EventListener {
-        @Subscribed fun `unregister event listener test`(event: EmptyEvent) {
+        @Subscribed
+        fun `unregister event listener test`(event: EmptyEvent) {
             fail("event listener was not unregistered")
         }
     }
@@ -159,7 +162,8 @@ class EventExceptionPassThroughTests : ExpectSpec({
     val bus = EventBus.default
 
     class EventListener {
-        @Subscribed fun `event handler function that throws a CustomException`(event: EmptyEvent) {
+        @Subscribed
+        fun `event handler function that throws a CustomException`(event: EmptyEvent) {
             throw CustomException()
         }
     }
@@ -184,11 +188,13 @@ class InvalidEventListenerFunctionTests : ExpectSpec({
     // devolves into cluttered and nested code, and it also makes it a lot harder to write function names that are
     // self-explanatory.
     class EventListenerArgumentLength {
-        @Subscribed fun `no arguments function`() {
+        @Subscribed
+        fun `no arguments function`() {
             fail("an event listener function with no arguments is invalid and should never be invoked by the system")
         }
 
-        @Subscribed fun `two event arguments function`(`event one`: EmptyEvent, `event two`: EmptyEvent) {
+        @Subscribed
+        fun `two event arguments function`(`event one`: EmptyEvent, `event two`: EmptyEvent) {
             fail("an event listener function with more than one event argument is invalid and should never be invoked by the system")
         }
     }
@@ -202,7 +208,8 @@ class InvalidEventListenerFunctionTests : ExpectSpec({
     }
 
     class EventListenerParamType {
-        @Subscribed fun `invalid argument type function`(`invalid type`: String) {
+        @Subscribed
+        fun `invalid argument type function`(`invalid type`: String) {
             fail("an event listener function is only allowed to have an argument of a type that's the same as the one defined when creating the event-bus")
         }
     }
@@ -216,11 +223,13 @@ class InvalidEventListenerFunctionTests : ExpectSpec({
     }
 
     class EventListenerVisibility {
-        @Subscribed private fun `private function test`(event: EmptyEvent) {
+        @Subscribed
+        private fun `private function test`(event: EmptyEvent) {
             fail("a private function should not be able to be a event listener")
         }
 
-        @Subscribed protected fun `protected function test`(event: EmptyEvent) {
+        @Subscribed
+        protected fun `protected function test`(event: EmptyEvent) {
             fail("a protected function should not be able to be a event listener")
         }
     }
@@ -228,19 +237,6 @@ class InvalidEventListenerFunctionTests : ExpectSpec({
     context("attempting to register a class with event listener functions with visibility lower than public") {
         expect("that the registration should fail with an 'InvalidListenerFunctionException'") {
             val listener = EventListenerVisibility()
-            shouldThrow<InvalidListenerFunctionException> { bus.register(listener) }
-        }
-    }
-
-    class EventListenerReturnType {
-        @Subscribed fun `invalid return type`(event: EmptyEvent): String {
-            fail("an event listener function is only allowed to return Unit/void")
-        }
-    }
-
-    context("attempting to register a class with event listener functions that has a return type other than Unit/void") {
-        expect("that the registration should fail with a 'InvalidListenerFunctionException'") {
-            val listener = EventListenerReturnType()
             shouldThrow<InvalidListenerFunctionException> { bus.register(listener) }
         }
     }
@@ -253,7 +249,8 @@ class InvocationStrategyTests : ExpectSpec({
                 val bus = EventBus<Event, Any>(strategy)
 
                 class EventListener {
-                    @Subscribed fun `receive event func`(event: EmptyEvent) {
+                    @Subscribed
+                    fun `receive event func`(event: EmptyEvent) {
                         fail("event was received")
                     }
                 }
@@ -272,7 +269,8 @@ class LocalListenerTests : ExpectSpec({
 
     context("creating a local object tied to a variable to act as a listener") {
         val listener = object {
-            @Subscribed fun `subscribed function`(event: EmptyEvent) {
+            @Subscribed
+            fun `subscribed function`(event: EmptyEvent) {
                 fail("function invoked")
             }
         }
@@ -293,7 +291,8 @@ class LocalListenerTests : ExpectSpec({
     context("creating a local object directly in the register invocation to act as a listener") {
         expect("that the object will receive invocations") {
             bus.register(object {
-                @Subscribed fun `subscribed function`(event: EmptyEvent) {
+                @Subscribed
+                fun `subscribed function`(event: EmptyEvent) {
                     fail("function invoked")
                 }
             })
@@ -308,7 +307,8 @@ class EventListenerTypeTest : ExpectSpec({
     val bus = EventBus<Event, ConstrainedListener>()
 
     class ValidListener : ConstrainedListener {
-        @Subscribed fun `i should be valid`(event: EmptyEvent) {
+        @Subscribed
+        fun `i should be valid`(event: EmptyEvent) {
             fail("i've been invoked")
         }
     }

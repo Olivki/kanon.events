@@ -34,7 +34,7 @@ class InvalidListenerFunctionException @JvmOverloads constructor(
     cause: Throwable? = null
 ) : Exception(message, cause) {
     companion object {
-        @JvmOverloads @JvmStatic fun of(
+        fun of(
             func: KFunction<*>,
             reason: String,
             cause: Throwable? = null
@@ -43,13 +43,12 @@ class InvalidListenerFunctionException @JvmOverloads constructor(
     }
 }
 
-@DslMarker internal annotation class assertion
-
-@assertion private inline fun requireFunc(func: KFunction<*>, condition: Boolean, lazyMsg: () -> Any) {
+private inline fun requireFunc(func: KFunction<*>, condition: Boolean, lazyMsg: () -> Any) {
     if (!condition) throw InvalidListenerFunctionException.of(func, lazyMsg().toString())
 }
 
-@PublishedApi @assertion internal fun <E : Any, L : Any> EventBus<E, L>.requireValidListener(func: KFunction<*>) {
+@PublishedApi
+internal fun <E : Any, L : Any> EventBus<E, L>.requireValidListener(func: KFunction<*>) {
     requireFunc(func, func.javaMethod?.returnType == Void.TYPE) { "return type is not Unit/void" }
     requireFunc(func, func.visibility == KVisibility.PUBLIC || func.visibility == KVisibility.INTERNAL) {
         "visibility needs to be public or internal"

@@ -44,6 +44,7 @@ import kotlin.reflect.jvm.javaMethod
 import moe.kanon.events.internal.InvalidListenerFunctionException
 import org.apache.logging.log4j.kotlin.KotlinLogger
 import org.apache.logging.log4j.kotlin.logger
+import kotlin.reflect.typeOf
 
 /**
  * An implementation of the [publish-subscribe pattern](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern).
@@ -56,7 +57,6 @@ import org.apache.logging.log4j.kotlin.logger
  * `this` bus.
  * @property [name] The name that the [logger] should use.
  */
-@Suppress("DataClassPrivateConstructor")
 class EventBus<E : Any, L : Any> private constructor(
     val eventClass: KClass<out E>,
     val listenerClass: KClass<out L>,
@@ -77,7 +77,6 @@ class EventBus<E : Any, L : Any> private constructor(
      * If the system encounters any malformed listener functions, then a [InvalidListenerFunctionException] will be
      * thrown, a listener function is considered malformed if it does *not* conform to the following standards:
      * - It has *more* or *less* than 1 parameter
-     * - It returns a value that's *not* [Unit] or [void][Void]
      * - Its visibility is not `public` or `internal`
      * - It is `abstract`
      * - The event parameter accepts an event that's not a sub-class of the [eventClass] defined in `this` bus
@@ -93,35 +92,31 @@ class EventBus<E : Any, L : Any> private constructor(
             return
         }
 
-        val functions = listener::class.declaredMemberFunctions
+        val wrappers = listener::class.declaredMemberFunctions
             .asSequence()
+            .filter { it.returnType == UNIT_TYPE }
             .filterIsInstance<KFunction<Unit>>()
             .filter { it.hasAnnotation<Subscribed>() }
+            .map { func -> ListenerWrapper(this, func, listener) }
 
-        if (functions.none()) {
+        if (wrappers.none()) {
             logger.info { "<${listener::class}> has no listener functions" }
             return
         }
 
-        for (func in functions) {
-            val wrapper = ListenerWrapper(
-                this,
-                func,
-                listener,
-                func.findAnnotation<Subscribed>()!!.priority.ordinal,
-                strategy.create(this, func)
-            )
-            repos.computeIfAbsent(wrapper.eventClass) { ListenerRepository() }.register(wrapper)
+        for (wrapper in wrappers) {
+            repos.getOrPut(wrapper.eventClass) { ListenerRepository() }.register(wrapper)
         }
 
-        logger.debug { "Registered event listener <${listener::class}> to $this" }
+        logger.info { "Registered event listener <${listener::class}> to $this" }
     }
 
     /**
      * Unregisters the given [listener] from `this` event-bus.
      *
-     * If no reference of the given `listener` is found, this function will just silently fail.
+     * If no reference of the given `listener` is found, this function will simply do nothing.
      */
+    @UseExperimental(ExperimentalStdlibApi::class)
     fun unregister(listener: L) {
         require(listenerClass.isInstance(listener)) { "<${listener::class}> is not a sub-class of <$listenerClass>" }
 
@@ -132,21 +127,14 @@ class EventBus<E : Any, L : Any> private constructor(
 
         listener::class.declaredMemberFunctions
             .asSequence()
+            .filter { it.returnType == UNIT_TYPE }
             .filterIsInstance<KFunction<Unit>>()
             .filter { it.hasAnnotation<Subscribed>() }
-            .map { func ->
-                ListenerWrapper(
-                    this,
-                    func,
-                    listener,
-                    func.findAnnotation<Subscribed>()!!.priority.ordinal,
-                    strategy.create(this, func)
-                )
-            }
-            .filter { repos.containsKey(it.eventClass) }
+            .map { func -> ListenerWrapper(this, func, listener) }
+            .filter { it.eventClass in repos }
             .forEach { repos.getValue(it.eventClass).unregister(it) }
 
-        logger.debug { "Unregistered event listener <${listener::class}>" }
+        logger.info { "Unregistered event listener <${listener::class}> from $this" }
     }
 
     /**
@@ -314,6 +302,9 @@ class EventBus<E : Any, L : Any> private constructor(
     }
 
     companion object {
+        @UseExperimental(ExperimentalStdlibApi::class)
+        private val UNIT_TYPE = typeOf<Unit>()
+
         /**
          * Returns a default implementation of an event-bus, where all events need to be sub-classes of [Event]
          * and the listeners can be anything as long as they inherit from [Any], and the [strategy] used is the
@@ -503,8 +494,10 @@ private class ListenerWrapper<E : Any, L : Any>(
     val bus: EventBus<E, L>,
     val func: KFunction<Unit>,
     val listener: L,
-    val priority: Int,
-    val executor: EventExecutor<E, L>,
+    val priority: EventPriority = requireNotNull(func.findAnnotation<Subscribed>()) {
+        "Given 'func' instance is not marked with a 'Subscribed' annotation"
+    }.priority,
+    val executor: EventExecutor<E, L> = bus.strategy.create(bus, func),
     val eventClass: KClass<out E> = func.valueParameters[0].clz as KClass<out E>
 ) : Comparable<ListenerWrapper<E, L>> {
     /**
