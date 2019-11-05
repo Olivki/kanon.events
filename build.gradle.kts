@@ -33,7 +33,6 @@ repositories {
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
     implementation(kotlin("reflect"))
-    //implementation(group = "io.github.microutils", name = "kotlin-logging", version = "1.6.24")
     implementation(group = "org.apache.logging.log4j", name = "log4j-api-kotlin", version = "1.0.0")
     implementation(group = "net.bytebuddy", name = "byte-buddy", version = "1.9.13")
 
