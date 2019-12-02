@@ -100,7 +100,7 @@ class EventBus<E : Any, L : Any> private constructor(
             .map { func -> ListenerWrapper(this, func, listener) }
 
         if (wrappers.none()) {
-            logger.info { "<${listener::class}> has no listener functions" }
+            logger.debug { "<${listener::class}> has no listener functions" }
             return
         }
 
@@ -108,7 +108,7 @@ class EventBus<E : Any, L : Any> private constructor(
             repos.getOrPut(wrapper.eventClass) { ListenerRepository() }.register(wrapper)
         }
 
-        logger.info { "Registered event listener <${listener::class}> to $this" }
+        logger.trace { "Registered event listener <${listener::class}> to $this" }
     }
 
     /**
@@ -134,7 +134,7 @@ class EventBus<E : Any, L : Any> private constructor(
             .filter { it.eventClass in repos }
             .forEach { repos.getValue(it.eventClass).unregister(it) }
 
-        logger.info { "Unregistered event listener <${listener::class}> from $this" }
+        logger.trace { "Unregistered event listener <${listener::class}> from $this" }
     }
 
     /**
